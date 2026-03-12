@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Procurement Process Simulator</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0d0f14;
+    --surface: #13161e;
+    --surface2: #1a1f2b;
+    --border: #252b3a;
+    --accent: #00e5ff;
+    --accent2: #ff6b35;
+    --accent3: #a259ff;
+    --success: #00e676;
+    --danger: #ff1744;
+    --warn: #ffd740;
+    --text: #e8eaf0;
+    --muted: #5a6380;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid noise texture */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 0 24px 80px; }
+
+  /* ---- HEADER ---- */
+  header {
+    padding: 40px 0 32px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 36px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .logo-block { display: flex; flex-direction: column; gap: 4px; }
+  .logo-tag {
+    font-size: 10px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-family: var(--mono);
+  }
+  h1 {
+    font-family: var(--sans);
+    font-size: clamp(24px, 4vw, 38px);
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -1px;
+  }
+  h1 span { color: var(--accent); }
+  .header-meta { font-size: 11px; color: var(--muted); text-align: right; }
+
+  /* ---- SCENARIO CONFIG ---- */
+  .config-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 2px solid var(--accent);
+    padding: 28px;
+    margin-bottom: 28px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  .config-panel h2 {
+    grid-column: 1/-1;
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+  .field { display: flex; flex-direction: column; gap: 8px; }
+  .field.full { grid-column: 1/-1; }
+  label { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+
+  input[type="text"], input[type="number"], select {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color .2s;
+    width: 100%;
+  }
+  input:focus, select:focus { border-color: var(--accent); }
+
+  .toggle-row { display: flex; align-items: center; gap: 12px; }
+  .toggle {
+    appearance: none;
+    width: 40px; height: 22px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    cursor: pointer;
+    position: relative;
+    transition: background .2s;
+    flex-shrink: 0;
+  }
+  .toggle::after {
+    content: '';
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: transform .2s, background .2s;
+  }
+  .toggle:checked { background: var(--accent); border-color: var(--accent); }
+  .toggle:checked::after { transform: translateX(18px); background: var(--bg); }
+  .toggle-label { font-size: 12px; color: var(--text); cursor: pointer; }
+
+  .btn-run {
+    grid-column: 1/-1;
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 14px 28px;
+    cursor: pointer;
+    transition: all .15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+  .btn-run:hover { background: #33ecff; transform: translateY(-1px); }
+  .btn-run:active { transform: translateY(0); }
+  .btn-run:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+
+  /* ---- PHASE PIPELINE ---- */
+  .pipeline {
+    display: flex;
+    gap: 0;
+    margin-bottom: 28px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+  .phase-step {
+    flex: 1;
+    min-width: 120px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-right: none;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    position: relative;
+    transition: all .3s;
+  }
+  .phase-step:last-child { border-right: 1px solid var(--border); }
+  .phase-step::after {
+    content: '›';
+    position: absolute;
+    right: -12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 20px;
+    color: var(--border);
+    z-index: 2;
+  }
+  .phase-step:last-child::after { display: none; }
+  .phase-step.active { border-color: var(--accent); background: rgba(0,229,255,.05); }
+  .phase-step.done { border-color: var(--success); background: rgba(0,230,118,.04); }
+  .phase-step.failed { border-color: var(--danger); background: rgba(255,23,68,.04); }
+  .phase-num { font-size: 9px; color: var(--muted); letter-spacing: 2px; }
+  .phase-name { font-family: var(--sans); font-size: 12px; font-weight: 700; }
+  .phase-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+    margin-top: 4px;
+    transition: background .3s;
+  }
+  .phase-step.active .phase-dot { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  .phase-step.done .phase-dot { background: var(--success); }
+  .phase-step.failed .phase-dot { background: var(--danger); }
+
+  /* ---- LOG TERMINAL ---- */
+  .terminal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 2px solid var(--accent2);
+    min-height: 340px;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 28px;
+  }
+  .terminal-bar {
+    background: var(--surface2);
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .dot-row { display: flex; gap: 6px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot.r { background: var(--danger); }
+  .dot.y { background: var(--warn); }
+  .dot.g { background: var(--success); }
+  .terminal-title { font-size: 10px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; }
+  .terminal-body {
+    padding: 20px;
+    flex: 1;
+    overflow-y: auto;
+    max-height: 400px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .log-line {
+    font-size: 12px;
+    line-height: 1.7;
+    display: flex;
+    gap: 12px;
+    animation: fadeIn .3s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
+  .log-time { color: var(--muted); flex-shrink: 0; font-size: 10px; padding-top: 1px; }
+  .log-msg { flex: 1; overflow-wrap: anywhere; }
+  .log-msg.info { color: var(--text); }
+  .log-msg.success { color: var(--success); }
+  .log-msg.error { color: var(--danger); }
+  .log-msg.warn { color: var(--warn); }
+  .log-msg.accent { color: var(--accent); }
+  .log-msg.accent2 { color: var(--accent2); }
+  .log-msg.accent3 { color: var(--accent3); }
+  .log-msg.section {
+    color: var(--accent);
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+    margin-top: 6px;
+  }
+  .log-empty { color: var(--muted); font-size: 12px; text-align: center; padding: 60px 0; }
+
+  /* ---- DOCUMENT CARDS ---- */
+  .docs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+  .doc-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    opacity: .35;
+    transition: all .4s;
+    position: relative;
+    overflow: hidden;
+  }
+  .doc-card.active {
+    opacity: 1;
+    border-color: var(--accent2);
+  }
+  .doc-card.active::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent2);
+  }
+  .doc-label { font-size: 9px; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); }
+  .doc-id { font-size: 11px; color: var(--accent); font-weight: 600; }
+  .doc-detail { font-size: 11px; color: var(--text); line-height: 1.5; }
+  .doc-badge {
+    font-size: 9px;
+    padding: 2px 8px;
+    border-radius: 2px;
+    display: inline-block;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    align-self: flex-start;
+  }
+  .badge-pending { background: rgba(255,215,64,.15); color: var(--warn); }
+  .badge-ok { background: rgba(0,230,118,.15); color: var(--success); }
+  .badge-fail { background: rgba(255,23,68,.15); color: var(--danger); }
+  .badge-info { background: rgba(0,229,255,.15); color: var(--accent); }
+
+  /* ---- ROLES LEGEND ---- */
+  .roles-bar {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 28px;
+  }
+  .role-chip {
+    font-size: 10px;
+    letter-spacing: 1px;
+    padding: 5px 12px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .role-chip .rc-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+  /* ---- RESULT BANNER ---- */
+  .result-banner {
+    display: none;
+    padding: 20px 28px;
+    margin-bottom: 28px;
+    font-family: var(--sans);
+    font-size: 16px;
+    font-weight: 700;
+    align-items: center;
+    gap: 14px;
+    animation: fadeIn .4s ease;
+  }
+  .result-banner.success { background: rgba(0,230,118,.1); border: 1px solid var(--success); color: var(--success); display: flex; }
+  .result-banner.fail { background: rgba(255,23,68,.1); border: 1px solid var(--danger); color: var(--danger); display: flex; }
+  .result-icon { font-size: 24px; }
+
+  /* ---- SPEED CONTROL ---- */
+  .speed-row { display: flex; align-items: center; gap: 12px; }
+  .speed-row input[type=range] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 100px; height: 4px;
+    background: var(--border);
+    border: none;
+    padding: 0;
+  }
+  .speed-row input[type=range]::-webkit-slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+  }
+
+  @media (max-width: 600px) {
+    .config-panel { grid-template-columns: 1fr; }
+    .config-panel h2, .btn-run, .field.full { grid-column: 1; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo-block">
+      <span class="logo-tag">// Procurement System v1.0</span>
+      <h1>Supply Chain <span>Process</span> Simulator</h1>
+    </div>
+    <div class="header-meta">
+      TypeScript Logic → GUI<br>
+      5 Roles · 4 Phases · Full Lifecycle
+    </div>
+  </header>
+
+  <!-- ROLES LEGEND -->
+  <div class="roles-bar">
+    <div class="role-chip"><span class="rc-dot" style="background:#00e5ff"></span>Shipping Office</div>
+    <div class="role-chip"><span class="rc-dot" style="background:#a259ff"></span>Buyer Agent</div>
+    <div class="role-chip"><span class="rc-dot" style="background:#ffd740"></span>Supervisor</div>
+    <div class="role-chip"><span class="rc-dot" style="background:#ff6b35"></span>Seller</div>
+    <div class="role-chip"><span class="rc-dot" style="background:#00e676"></span>Receive Agent</div>
+  </div>
+
+  <!-- CONFIG PANEL -->
+  <div class="config-panel">
+    <h2>⚙ Scenario Configuration</h2>
+
+    <div class="field full">
+      <label>Item Description</label>
+      <input type="text" id="itemDesc" value="Office furniture for 10 workstations" />
+    </div>
+
+    <div class="field">
+      <label>Seller Name</label>
+      <input type="text" id="sellerName" value="Acme Supplies Inc." />
+    </div>
+
+    <div class="field">
+      <label>Initial Quote Amount ($)</label>
+      <input type="number" id="quoteAmount" value="8500" min="100" />
+    </div>
+
+    <div class="field">
+      <label>Supervisor Review Required</label>
+      <div class="toggle-row">
+        <input type="checkbox" class="toggle" id="requiresReview" />
+        <label class="toggle-label" for="requiresReview">Enable supervisor approval step</label>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Supervisor will reject RFQ</label>
+      <div class="toggle-row">
+        <input type="checkbox" class="toggle" id="supervisorRejects" />
+        <label class="toggle-label" for="supervisorRejects">Simulate supervisor rejection</label>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Animation Speed</label>
+      <div class="speed-row">
+        <input type="range" id="speed" min="1" max="5" value="3" />
+        <span id="speedLabel" style="font-size:11px;color:var(--muted)">Normal</span>
+      </div>
+    </div>
+
+    <button class="btn-run" id="runBtn" onclick="window.runProcess && window.runProcess()">
+      <span>▶</span> Run Procurement Process
+    </button>
+  </div>
+
+  <!-- PHASE PIPELINE -->
+  <div class="pipeline">
+    <div class="phase-step" id="ph1">
+      <span class="phase-num">PHASE 01</span>
+      <span class="phase-name">Requisition & RFQ</span>
+      <span class="phase-dot"></span>
+    </div>
+    <div class="phase-step" id="ph2">
+      <span class="phase-num">PHASE 02</span>
+      <span class="phase-name">Quote Negotiation</span>
+      <span class="phase-dot"></span>
+    </div>
+    <div class="phase-step" id="ph3">
+      <span class="phase-num">PHASE 03</span>
+      <span class="phase-name">Purchase Order</span>
+      <span class="phase-dot"></span>
+    </div>
+    <div class="phase-step" id="ph4">
+      <span class="phase-num">PHASE 04</span>
+      <span class="phase-name">Reception & Payment</span>
+      <span class="phase-dot"></span>
+    </div>
+  </div>
+
+  <!-- RESULT BANNER -->
+  <div class="result-banner" id="resultBanner">
+    <span class="result-icon" id="resultIcon"></span>
+    <span id="resultText"></span>
+  </div>
+
+  <!-- LOG TERMINAL -->
+  <div class="terminal">
+    <div class="terminal-bar">
+      <div class="dot-row">
+        <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+      </div>
+      <span class="terminal-title">process_log.stdout</span>
+    </div>
+    <div class="terminal-body" id="logBody">
+      <div class="log-empty">// Configure scenario above and press RUN to start the simulation.</div>
+    </div>
+  </div>
+
+  <!-- DOCUMENT CARDS -->
+  <div class="docs-grid">
+    <div class="doc-card" id="card-req">
+      <span class="doc-label">Document · REQ</span>
+      <span class="doc-id" id="req-id">—</span>
+      <span class="doc-detail" id="req-detail">Not generated</span>
+      <span class="doc-badge badge-pending" id="req-badge">Pending</span>
+    </div>
+    <div class="doc-card" id="card-rfq">
+      <span class="doc-label">Document · RFQ</span>
+      <span class="doc-id" id="rfq-id">—</span>
+      <span class="doc-detail" id="rfq-detail">Not created</span>
+      <span class="doc-badge badge-pending" id="rfq-badge">Pending</span>
+    </div>
+    <div class="doc-card" id="card-quote">
+      <span class="doc-label">Document · QUOTE</span>
+      <span class="doc-id" id="quote-id">—</span>
+      <span class="doc-detail" id="quote-detail">Not submitted</span>
+      <span class="doc-badge badge-pending" id="quote-badge">Pending</span>
+    </div>
+    <div class="doc-card" id="card-po">
+      <span class="doc-label">Document · PO</span>
+      <span class="doc-id" id="po-id">—</span>
+      <span class="doc-detail" id="po-detail">Not created</span>
+      <span class="doc-badge badge-pending" id="po-badge">Pending</span>
+    </div>
+    <div class="doc-card" id="card-delivery">
+      <span class="doc-label">Document · DELIVERY NOTE</span>
+      <span class="doc-id" id="dn-id">—</span>
+      <span class="doc-detail" id="dn-detail">Not issued</span>
+      <span class="doc-badge badge-pending" id="dn-badge">Pending</span>
+    </div>
+    <div class="doc-card" id="card-invoice">
+      <span class="doc-label">Document · INVOICE</span>
+      <span class="doc-id" id="inv-id">—</span>
+      <span class="doc-detail" id="inv-detail">Not issued</span>
+      <span class="doc-badge badge-pending" id="inv-badge">Pending</span>
+    </div>
+  </div>
+
+</div>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>

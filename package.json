@@ -1,0 +1,23 @@
+{
+  "name": "procurement-app",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "vite": "^8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SoFzzz/Listas-Estructura.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SoFzzz/Listas-Estructura/issues"
+  },
+  "homepage": "https://github.com/SoFzzz/Listas-Estructura#readme"
+}
