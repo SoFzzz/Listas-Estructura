@@ -1,30 +1,156 @@
 import { ProcurementProcess, type ProcessCallbacks } from './services/ProcurementProcess';
+import { LinkedList } from './models/LinkedList';
 
-let running = false;
-let speedDelay = 700;
+// Interfaces for our pending items
+interface PendingItem {
+  id: string;
+  description: string;
+  amount: number;
+}
 
-const speedLabels: Record<string, string> = { '1':'Very Slow', '2':'Slow', '3':'Normal', '4':'Fast', '5':'Instant' };
-const speedMs: Record<string, number> = { '1':1500, '2':1000, '3':700, '4':300, '5':50 };
+let pendingItems: PendingItem[] = [];
+let processInstance: ProcurementProcess;
+
+// Mock callbacks for manual process
+const callbacks: ProcessCallbacks = {
+  logger: addLog,
+  setPhase: () => {}, // Not used in manual mode
+  activateCard: () => {}, // Not used in manual mode
+  updateCard: () => {}, // Not used in manual mode
+  showResult: showResult,
+  renderList: renderLinkedList,
+  onFinish: () => {}
+};
 
 document.addEventListener('DOMContentLoaded', () => {
-  const speedEl = document.getElementById('speed') as HTMLInputElement;
-  const speedLabelEl = document.getElementById('speedLabel');
-  
-  if (speedEl && speedLabelEl) {
-    speedEl.addEventListener('input', function() {
-      speedDelay = speedMs[this.value] || 700;
-      speedLabelEl.textContent = speedLabels[this.value] || 'Normal';
-    });
+  processInstance = new ProcurementProcess("Acme Supplies Inc.", callbacks);
+
+  const addBtn = document.getElementById('addBtn');
+  if (addBtn) {
+    addBtn.addEventListener('click', onAddItem);
   }
 
-  const runBtn = document.getElementById('runBtn');
-  if (runBtn) {
-    runBtn.addEventListener('click', runProcess);
-  }
+  renderPendingList();
+  renderLinkedList(processInstance.documentList);
 });
 
-function sleep(ms: number = speedDelay): Promise<void> {
-  return new Promise(r => setTimeout(r, ms));
+function onAddItem() {
+  const descEl = document.getElementById('itemDesc') as HTMLInputElement;
+  const desc = descEl ? descEl.value || 'Generic item' : 'Generic item';
+  
+  // Clear input
+  if(descEl) descEl.value = '';
+
+  const id = `REQ-${Math.floor(Math.random() * 9000) + 1000}`;
+  
+  pendingItems.push({
+    id,
+    description: desc,
+    amount: 5000 // Default quote for demo
+  });
+
+  addLog(`New Requisition request added: ${id}`, 'success');
+  renderPendingList();
+}
+
+function onDeleteItem(id: string) {
+  pendingItems = pendingItems.filter(item => item.id !== id);
+  addLog(`Requisition request ${id} deleted.`, 'warn');
+  renderPendingList();
+}
+
+function onEditItem(id: string) {
+  const item = pendingItems.find(i => i.id === id);
+  if (!item) return;
+
+  const newDesc = prompt("Edit Item Description:", item.description);
+  if (newDesc !== null && newDesc.trim() !== "") {
+    item.description = newDesc.trim();
+    addLog(`Requisition request ${id} updated.`, 'info');
+    renderPendingList();
+  }
+}
+
+async function onProcessItem(id: string) {
+  const itemIndex = pendingItems.findIndex(i => i.id === id);
+  if (itemIndex === -1) return;
+  
+  const item = pendingItems[itemIndex];
+  
+  // Remove from pending list immediately
+  pendingItems.splice(itemIndex, 1);
+  renderPendingList();
+  
+  addLog(`Processing Requisition ${item.id}...`, 'accent');
+  
+  // Execute process for this single item
+  await processInstance.run(item.description, false, item.amount, false);
+}
+
+function renderPendingList() {
+  const container = document.getElementById('pendingListBody');
+  if (!container) return;
+  
+  container.innerHTML = '';
+  
+  if (pendingItems.length === 0) {
+    container.innerHTML = '<div class="log-empty">// No pending requisitions right now. Add one above.</div>';
+    return;
+  }
+
+  pendingItems.forEach(item => {
+    const el = document.createElement('div');
+    el.className = 'pending-item';
+    
+    el.innerHTML = `
+      <div class="pending-info">
+        <span class="pending-id">${item.id}</span>
+        <span class="pending-desc">${item.description}</span>
+      </div>
+      <div class="pending-actions">
+        <button class="btn-sm" onclick="window.editItem('${item.id}')">Edit</button>
+        <button class="btn-sm danger" onclick="window.deleteItem('${item.id}')">Delete</button>
+        <button class="btn-sm primary" onclick="window.processItem('${item.id}')">Process ➔</button>
+      </div>
+    `;
+    container.appendChild(el);
+  });
+}
+
+function renderLinkedList(list: LinkedList<any>) {
+  const container = document.getElementById('linkedListView');
+  if (!container) return;
+  container.innerHTML = '';
+  
+  const items = list.toArray();
+  
+  if (items.length === 0) {
+    container.innerHTML = '<div class="log-empty" style="width:100%">// Document LinkedList visualization will appear here.</div>';
+    return;
+  }
+
+  items.forEach((item, index) => {
+    const { type, data } = item;
+    
+    // Check if data is an object and has an ID property, or generic string
+    let dataLabel = (data && data.id) ? data.id : "Document";
+
+    const nodeEl = document.createElement('div');
+    nodeEl.className = 'll-node';
+    nodeEl.innerHTML = `
+      <span class="ll-node-type">${type.replace('_', ' ')}</span>
+      <span class="ll-node-id">${dataLabel}</span>
+    `;
+    container.appendChild(nodeEl);
+
+    // Arrow if not last
+    if (index !== items.length - 1) {
+      const arrowEl = document.createElement('div');
+      arrowEl.className = 'll-arrow';
+      arrowEl.innerHTML = '➔';
+      container.appendChild(arrowEl);
+    }
+  });
 }
 
 function addLog(msg: string, type: string = 'info') {
@@ -43,30 +169,6 @@ function addLog(msg: string, type: string = 'info') {
   body.scrollTop = body.scrollHeight;
 }
 
-function setPhase(num: number, state: string) {
-  const el = document.getElementById(`ph${num}`);
-  if (el) el.className = `phase-step ${state}`;
-}
-
-function activateCard(cardId: string) {
-  const el = document.getElementById(cardId);
-  if (el) el.classList.add('active');
-}
-
-function updateCard(idEl: string, detailEl: string, badgeEl: string, id: string, detail: string, badgeClass: string, badgeText: string) {
-  const idElem = document.getElementById(idEl);
-  if (idElem) idElem.textContent = id;
-  
-  const detailElem = document.getElementById(detailEl);
-  if (detailElem) detailElem.textContent = detail;
-  
-  const b = document.getElementById(badgeEl);
-  if (b) {
-    b.className = `doc-badge ${badgeClass}`;
-    b.textContent = badgeText;
-  }
-}
-
 function showResult(success: boolean, text: string) {
   const banner = document.getElementById('resultBanner');
   const icon = document.getElementById('resultIcon');
@@ -77,78 +179,7 @@ function showResult(success: boolean, text: string) {
   if (txt) txt.textContent = text;
 }
 
-function resetUI() {
-  [1,2,3,4].forEach(n => setPhase(n, ''));
-  const banner = document.getElementById('resultBanner');
-  if (banner) banner.className = 'result-banner';
-  
-  const logBody = document.getElementById('logBody');
-  if (logBody) logBody.innerHTML = '<div class="log-empty">// Configure scenario above and press RUN to start the simulation.</div>';
-
-  ['card-req','card-rfq','card-quote','card-po','card-delivery','card-invoice']
-    .forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.classList.remove('active');
-    });
-
-  const resets: [string, string][] = [
-    ['req-id','—'],['req-detail','Not generated'],['req-badge','badge-pending'],
-    ['rfq-id','—'],['rfq-detail','Not created'],['rfq-badge','badge-pending'],
-    ['quote-id','—'],['quote-detail','Not submitted'],['quote-badge','badge-pending'],
-    ['po-id','—'],['po-detail','Not created'],['po-badge','badge-pending'],
-    ['dn-id','—'],['dn-detail','Not issued'],['dn-badge','badge-pending'],
-    ['inv-id','—'],['inv-detail','Not issued'],['inv-badge','badge-pending'],
-  ];
-  
-  resets.forEach(([id, val]) => {
-    const el = document.getElementById(id);
-    if (el) {
-      if (id.endsWith('-badge')) { el.className = `doc-badge ${val}`; el.textContent = 'Pending'; }
-      else el.textContent = val;
-    }
-  });
-}
-
-async function runProcess() {
-  if (running) return;
-  running = true;
-
-  const runBtn = document.getElementById('runBtn') as HTMLButtonElement | null;
-  if (runBtn) runBtn.disabled = true;
-  
-  resetUI();
-
-  const itemDescEl = document.getElementById('itemDesc') as HTMLInputElement | null;
-  const itemDesc = itemDescEl ? itemDescEl.value || 'Generic item' : 'Generic item';
-  
-  const sellerNameEl = document.getElementById('sellerName') as HTMLInputElement | null;
-  const sellerName = sellerNameEl ? sellerNameEl.value || 'Vendor Co.' : 'Vendor Co.';
-  
-  const quoteAmountEl = document.getElementById('quoteAmount') as HTMLInputElement | null;
-  const quoteAmount = quoteAmountEl ? parseFloat(quoteAmountEl.value) || 5000 : 5000;
-  
-  const requiresReviewEl = document.getElementById('requiresReview') as HTMLInputElement | null;
-  const requiresReview = requiresReviewEl ? requiresReviewEl.checked : false;
-  
-  const supervisorRejectsEl = document.getElementById('supervisorRejects') as HTMLInputElement | null;
-  const supervisorRejects = supervisorRejectsEl ? supervisorRejectsEl.checked : false;
-
-  const callbacks: ProcessCallbacks = {
-    logger: addLog,
-    sleep: () => sleep(speedDelay),
-    setPhase,
-    activateCard,
-    updateCard,
-    showResult,
-    onFinish: () => {
-      running = false;
-      if (runBtn) runBtn.disabled = false;
-    }
-  };
-
-  const process = new ProcurementProcess(sellerName, callbacks);
-  await process.run(itemDesc, requiresReview, quoteAmount, supervisorRejects);
-}
-
-// Add runProcess to window objects to be callable from inline onclick
-(window as any).runProcess = runProcess;
+// Global exposure for inline events
+(window as any).editItem = onEditItem;
+(window as any).deleteItem = onDeleteItem;
+(window as any).processItem = onProcessItem;

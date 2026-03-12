@@ -274,6 +274,56 @@
   }
   .log-empty { color: var(--muted); font-size: 12px; text-align: center; padding: 60px 0; }
 
+  /* ---- PENDING ITEM WIDGET ---- */
+  .pending-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 14px 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    animation: fadeIn .3s ease;
+  }
+  .pending-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .pending-id {
+    font-size: 11px;
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .pending-desc {
+    font-size: 13px;
+    color: var(--text);
+  }
+  .pending-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .btn-sm {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 12px;
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all .2s;
+  }
+  .btn-sm:hover { border-color: var(--text); }
+  .btn-sm.danger { color: var(--danger); }
+  .btn-sm.danger:hover { background: rgba(255,23,68,.1); border-color: var(--danger); }
+  .btn-sm.primary { background: var(--accent); color: var(--bg); border: none; }
+  .btn-sm.primary:hover { background: #33ecff; }
+
   /* ---- DOCUMENT CARDS ---- */
   .docs-grid {
     display: grid;
@@ -371,6 +421,48 @@
     cursor: pointer;
   }
 
+  /* ---- LINKED LIST VIEW ---- */
+  .linked-list-view {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 20px;
+    margin-bottom: 28px;
+    align-items: flex-start;
+  }
+  .ll-node {
+    background: var(--surface2);
+    border: 1px dashed var(--accent);
+    padding: 14px 20px;
+    min-width: 180px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    position: relative;
+    border-radius: 4px;
+    animation: fadeIn .4s ease;
+  }
+  .ll-node-type {
+    font-size: 10px;
+    color: var(--accent);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  .ll-node-id {
+    font-size: 13px;
+    font-family: var(--sans);
+    color: var(--text);
+  }
+  .ll-arrow {
+    color: var(--muted);
+    font-size: 18px;
+    flex-shrink: 0;
+    margin-top: 18px;
+    animation: fadeIn .4s ease;
+  }
+
   @media (max-width: 600px) {
     .config-panel { grid-template-columns: 1fr; }
     .config-panel h2, .btn-run, .field.full { grid-column: 1; }
@@ -401,77 +493,33 @@
     <div class="role-chip"><span class="rc-dot" style="background:#00e676"></span>Receive Agent</div>
   </div>
 
-  <!-- CONFIG PANEL -->
+  <!-- ADD ITEM FORM -->
   <div class="config-panel">
-    <h2>⚙ Scenario Configuration</h2>
-
+    <h2>➕ Create Requisition</h2>
     <div class="field full">
       <label>Item Description</label>
-      <input type="text" id="itemDesc" value="Office furniture for 10 workstations" />
+      <input type="text" id="itemDesc" placeholder="e.g., Office furniture for 10 workstations" />
     </div>
 
-    <div class="field">
-      <label>Seller Name</label>
-      <input type="text" id="sellerName" value="Acme Supplies Inc." />
-    </div>
-
-    <div class="field">
-      <label>Initial Quote Amount ($)</label>
-      <input type="number" id="quoteAmount" value="8500" min="100" />
-    </div>
-
-    <div class="field">
-      <label>Supervisor Review Required</label>
-      <div class="toggle-row">
-        <input type="checkbox" class="toggle" id="requiresReview" />
-        <label class="toggle-label" for="requiresReview">Enable supervisor approval step</label>
-      </div>
-    </div>
-
-    <div class="field">
-      <label>Supervisor will reject RFQ</label>
-      <div class="toggle-row">
-        <input type="checkbox" class="toggle" id="supervisorRejects" />
-        <label class="toggle-label" for="supervisorRejects">Simulate supervisor rejection</label>
-      </div>
-    </div>
-
-    <div class="field">
-      <label>Animation Speed</label>
-      <div class="speed-row">
-        <input type="range" id="speed" min="1" max="5" value="3" />
-        <span id="speedLabel" style="font-size:11px;color:var(--muted)">Normal</span>
-      </div>
-    </div>
-
-    <button class="btn-run" id="runBtn" onclick="window.runProcess && window.runProcess()">
-      <span>▶</span> Run Procurement Process
+    <button class="btn-run" id="addBtn">
+      <span>+</span> Add to Pending Requisitions
     </button>
   </div>
 
-  <!-- PHASE PIPELINE -->
-  <div class="pipeline">
-    <div class="phase-step" id="ph1">
-      <span class="phase-num">PHASE 01</span>
-      <span class="phase-name">Requisition & RFQ</span>
-      <span class="phase-dot"></span>
+  <!-- PENDING ITEMS LIST -->
+  <div class="terminal" style="border-top: 2px solid var(--accent); margin-bottom: 28px;">
+    <div class="terminal-bar">
+      <div class="dot-row">
+        <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+      </div>
+      <span class="terminal-title">pending_requisitions.list</span>
     </div>
-    <div class="phase-step" id="ph2">
-      <span class="phase-num">PHASE 02</span>
-      <span class="phase-name">Quote Negotiation</span>
-      <span class="phase-dot"></span>
-    </div>
-    <div class="phase-step" id="ph3">
-      <span class="phase-num">PHASE 03</span>
-      <span class="phase-name">Purchase Order</span>
-      <span class="phase-dot"></span>
-    </div>
-    <div class="phase-step" id="ph4">
-      <span class="phase-num">PHASE 04</span>
-      <span class="phase-name">Reception & Payment</span>
-      <span class="phase-dot"></span>
+    <div class="terminal-body" id="pendingListBody">
+      <div class="log-empty">// No pending requisitions right now. Add one above.</div>
     </div>
   </div>
+
+
 
   <!-- RESULT BANNER -->
   <div class="result-banner" id="resultBanner">
@@ -492,45 +540,12 @@
     </div>
   </div>
 
-  <!-- DOCUMENT CARDS -->
-  <div class="docs-grid">
-    <div class="doc-card" id="card-req">
-      <span class="doc-label">Document · REQ</span>
-      <span class="doc-id" id="req-id">—</span>
-      <span class="doc-detail" id="req-detail">Not generated</span>
-      <span class="doc-badge badge-pending" id="req-badge">Pending</span>
-    </div>
-    <div class="doc-card" id="card-rfq">
-      <span class="doc-label">Document · RFQ</span>
-      <span class="doc-id" id="rfq-id">—</span>
-      <span class="doc-detail" id="rfq-detail">Not created</span>
-      <span class="doc-badge badge-pending" id="rfq-badge">Pending</span>
-    </div>
-    <div class="doc-card" id="card-quote">
-      <span class="doc-label">Document · QUOTE</span>
-      <span class="doc-id" id="quote-id">—</span>
-      <span class="doc-detail" id="quote-detail">Not submitted</span>
-      <span class="doc-badge badge-pending" id="quote-badge">Pending</span>
-    </div>
-    <div class="doc-card" id="card-po">
-      <span class="doc-label">Document · PO</span>
-      <span class="doc-id" id="po-id">—</span>
-      <span class="doc-detail" id="po-detail">Not created</span>
-      <span class="doc-badge badge-pending" id="po-badge">Pending</span>
-    </div>
-    <div class="doc-card" id="card-delivery">
-      <span class="doc-label">Document · DELIVERY NOTE</span>
-      <span class="doc-id" id="dn-id">—</span>
-      <span class="doc-detail" id="dn-detail">Not issued</span>
-      <span class="doc-badge badge-pending" id="dn-badge">Pending</span>
-    </div>
-    <div class="doc-card" id="card-invoice">
-      <span class="doc-label">Document · INVOICE</span>
-      <span class="doc-id" id="inv-id">—</span>
-      <span class="doc-detail" id="inv-detail">Not issued</span>
-      <span class="doc-badge badge-pending" id="inv-badge">Pending</span>
-    </div>
+  <!-- LINKED LIST DATA STRUCTURE -->
+  <div class="linked-list-view" id="linkedListView">
+    <div class="log-empty" style="width:100%">// Document LinkedList visualization will appear here.</div>
   </div>
+
+
 
 </div>
 <script type="module" src="/src/main.ts"></script>
